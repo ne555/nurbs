@@ -4,11 +4,11 @@
 #include <GL/glut.h>
 #include <vector>
 
-namespace{
-	std::string file;
+namespace{ //globales
+	std::string file; //eliminar
 	const int knot_line = 0;
 	float
-		color_fondo[] = {1,1,1,1},
+		color_fondo[] = {0,0,0,0},
 		color_cline[]={.2f,.2f,.4f}, // poligono de control
 		color_cpoint[]={.3f,0.2f,0.8f}, // puntos de control
 		color_nurb[]={.8f,.6f,.6f}, // curva
@@ -31,13 +31,14 @@ void idle_cb() ;
 
 class Point{
 	public:
-		Point(double x, double y){
+		typedef float value_type; //las funciones de OpenGL requieren float
+		Point(value_type x, value_type y){ //puntos en el plano
 			this->x[0] = x;
 			this->x[1] = y;
-			this->x[2] = 0;
+			this->x[2] = 0; 
 			this->x[3] = 1;
 		}
-		double x[4];
+		value_type x[4];
 };
 
 class Nurbs{
@@ -47,27 +48,66 @@ class Nurbs{
 
 	Nurbs(): order(4){}
 
-	bool Dibujar(){
+	bool dibujar(){
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		//poligono de control
 		glColor3fv(color_cpoint);
 		glBegin(GL_POINTS);{
 			for(int K=0; K<control.size(); ++K)
-				glVertex4dv( control[K].x );
+				glVertex4fv( control[K].x );
 		}glEnd();
 		glBegin(GL_LINE_STRIP);{
 			for(int K=0; K<control.size(); ++K)
-				glVertex4dv( control[K].x );
+				glVertex4fv( control[K].x );
 		}glEnd();
 
+		//no hay suficientes puntos para definir la curva
 		if(control.size() < order)
 			return false;
 
-		std::vector<double> knots;
+		//dibuja nurbs con knots distruidos uniformemente
+		int n = control.size() + order;
+		std::vector<Point::value_type> knots(n);
+		//distribucion uniforme 
+		//TODO: permitir cambiar la distribución
+		for(int K=0; K<n; ++K)
+			knots[K] = K*1.0/(n-1);
+
+		for(int K=0; K<n; ++K)
+			std::cerr << knots[K] << ' ';
+		std::cerr << '\n';
+
+
+		glColor3fv(color_nurb);
+		glLineWidth(1);
+		GLUnurbs *oNurb = gluNewNurbsRenderer();
+		gluNurbsProperty(oNurb, GLU_SAMPLING_TOLERANCE, 1.0); //?resolucion?
+		gluBeginCurve(oNurb);{
+			gluNurbsCurve(
+				oNurb,
+				knots.size(), knots.data(),
+				4, (Point::value_type*) control.data(), //stride and control points
+				order,
+				GL_MAP1_VERTEX_3
+			);
+		}gluEndCurve(oNurb);
+
 		glPopAttrib();
+		gluDeleteNurbsRenderer(oNurb); //TODO: encapsular el New/Delete
 		return true;
 	}
-	void AddControlPoint( Point p ){
+
+	void add_control_point( Point p ){
 		this->control.push_back(p);
+	}
+
+	void increase_order(){
+		++order;
+	}
+
+	void decrease_order(){
+		if(order > 2)
+			--order;
 	}
 
 };
@@ -98,7 +138,7 @@ void init() {
 
 	glutDisplayFunc(display_cb);
 	glutMouseFunc(mouse_cb);
-	//glutKeyboardFunc(keyboard_cb);
+	glutKeyboardFunc(keyboard_cb);
 	//glutMotionFunc(motion_cb);
 	//glutPassiveMotionFunc(motion_cb);
 	glutReshapeFunc(reshape_cb);
@@ -113,16 +153,14 @@ void display_cb() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3d(0,1,0);
 	glPointSize(10);
-	glBegin(GL_POINTS);{
-		glVertex2d(-.9,.9);
-		glVertex2d(.9,.9);
-		glVertex2d(-.9,-.9);
-		glVertex2d(.9,-.9);
-		glVertex2d(0,0);
-		glVertex2d(100,100);
-		glVertex2d(300,500);
-	}glEnd();
-	nurbs.Dibujar();
+
+	for(int K=-2; K<=2; ++K)
+		for(int L=-2; L<=2; ++L){
+			glBegin(GL_POINTS);{
+				glVertex2d(K*.5,L*.5);
+			}glEnd();
+		}
+	nurbs.dibujar();
 	glutSwapBuffers();
 }
 
@@ -148,6 +186,7 @@ void display_cb() {
 		cout<<"  tecla k: mostrar/ocultar los knots sobre la curva\n";
 		cout<<"  tecla f: mostrar/ocultar las funciones base\n";
 		cout<<"  tecla c: permitir/no permitir seleccionar un knot sobre la curva\n";
+		cout<<"  tecla a/A: aumentar/disminuir el order\n";
 		cout<<"  tecla r: invertir el orden de los puntos en la curva sin alterarla\n";
 		cout<<"  teclas + y -: zoom in y out en torno al cursor del mouse\n";
 		cout<<"  tecla s: guarda la nurb en el archivo que se paso por parametro (o nurb.nurb)\n";
@@ -161,7 +200,7 @@ void mouse_cb(int button, int state, int x, int y){
 	if( button==GLUT_LEFT_BUTTON ){
 		if( state==GLUT_DOWN ){
 			//agrega puntos de control
-			nurbs.AddControlPoint( Point(xx,yy) );
+			nurbs.add_control_point( Point(xx,yy) );
 			glutPostRedisplay();
 		}
 	}
@@ -179,5 +218,15 @@ void reshape_cb(int aw, int ah){
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
+	glutPostRedisplay();
+}
+
+void keyboard_cb(unsigned char key,int x,int y) {
+	if(key == 'a')
+		nurbs.increase_order();
+	else if(key == 'A')
+		nurbs.decrease_order();
+
+	std::cerr << "order: " << nurbs.order << '\n';
 	glutPostRedisplay();
 }
