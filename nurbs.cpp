@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <cstring>
 #include <cstdlib>
+#include <unistd.h>
 
 #if WIN32
 static void *font=((void*)6);
@@ -24,7 +25,7 @@ static void *font=GLUT_BITMAP_HELVETICA_12;
 
 using namespace std;
 static float // colores
-color_fondo[]={0.95f,0.98f,1.0},       // color de fondo
+	color_fondo[]={0.95f,0.98f,1.0},       // color de fondo
 	color_cline[]={.2f,.2f,.4f}, // poligono de control
 	color_cpoint[]={.3f,0.2f,0.8f}, // puntos de control
 	color_nurb[]={.8f,.6f,.6f}, // curva
@@ -829,6 +830,7 @@ void display_cb() {
 
 
 void idle_cb() {
+	usleep(1000);
 	int x=mx, y=my;
 	if (mouse_moved && drag==MT_NONE) { // si no estamos haciendo nada marcar la seleccion si hay algo debajo del cursor
 		if (draw_detail && x>w-MARGIN-10 && x<w-MARGIN+10 && y>detail_pos-10 && y<detail_pos+10) {
