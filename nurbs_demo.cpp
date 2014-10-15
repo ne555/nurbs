@@ -25,7 +25,7 @@ void init();
 void display_cb();
 void mouse_cb(int button, int state, int x, int y);
 void keyboard_cb(unsigned char key,int x,int y) ;
-void motion_cb(int x, int y) ; 
+void motion_cb(int x, int y) ;
 void reshape_cb(int aw, int ah);
 void idle_cb() ;
 
@@ -35,7 +35,7 @@ class Point{
 		Point(value_type x, value_type y){ //puntos en el plano
 			this->x[0] = x;
 			this->x[1] = y;
-			this->x[2] = 0; 
+			this->x[2] = 0;
 			this->x[3] = 1;
 		}
 		value_type x[4];
@@ -44,9 +44,17 @@ class Point{
 class Nurbs{
 	public:
 	std::vector<Point> control;
+	std::vector<float> knots;
+	//invariant knots.size = control.size+order
+	//the first and last values are not used
 	int order;
+	bool cerrada;
 
-	Nurbs(): order(4){}
+	Nurbs(): order(4){
+		knots.resize( order );
+		uniforme();
+		cerrada = false;
+	}
 
 	bool dibujar(){
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -56,24 +64,20 @@ class Nurbs{
 			for(int K=0; K<control.size(); ++K)
 				glVertex4fv( control[K].x );
 		}glEnd();
+
 		glBegin(GL_LINE_STRIP);{
 			for(int K=0; K<control.size(); ++K)
 				glVertex4fv( control[K].x );
+			if(cerrada)
+				glVertex4fv( control[0].x );
 		}glEnd();
 
 		//no hay suficientes puntos para definir la curva
 		if(control.size() < order)
 			return false;
 
-		//dibuja nurbs con knots distruidos uniformemente
-		int n = control.size() + order;
-		std::vector<Point::value_type> knots(n);
-		//distribucion uniforme 
 		//TODO: permitir cambiar la distribución
-		for(int K=0; K<n; ++K)
-			knots[K] = K*1.0/(n-1);
-
-		for(int K=0; K<n; ++K)
+		for(int K=0; K<knots.size(); ++K)
 			std::cerr << knots[K] << ' ';
 		std::cerr << '\n';
 
@@ -82,15 +86,42 @@ class Nurbs{
 		glLineWidth(1);
 		GLUnurbs *oNurb = gluNewNurbsRenderer();
 		gluNurbsProperty(oNurb, GLU_SAMPLING_TOLERANCE, 1.0); //?resolucion?
-		gluBeginCurve(oNurb);{
-			gluNurbsCurve(
-				oNurb,
-				knots.size(), knots.data(),
-				4, (Point::value_type*) control.data(), //stride and control points
-				order,
-				GL_MAP1_VERTEX_3
-			);
-		}gluEndCurve(oNurb);
+		if(cerrada){
+			//@@@
+			std::vector<Point> control_aux = control;
+			control_aux.insert( control_aux.end(), control.begin(), control.begin()+order-1 );
+			std::vector<float> knots_aux = knots;
+			knots_aux.resize( control_aux.size()+order );
+			for(int K=knots.size()-1; K<knots_aux.size()-1; ++K)
+				knots_aux[K] = 1+knots[K-knots.size()+3];
+			//normalise
+			double factor = knots_aux[knots_aux.size()-2];
+			for(int K=0; K<knots_aux.size(); ++K)
+				knots_aux[K] /= factor;
+			knots_aux.back() = 1;
+
+			gluBeginCurve(oNurb);{
+				gluNurbsCurve(
+						oNurb,
+						knots_aux.size(), knots_aux.data(),
+						4, (Point::value_type*) control_aux.data(), //stride and control points
+						order,
+						GL_MAP1_VERTEX_3
+						);
+			}gluEndCurve(oNurb);
+
+		}
+		else{
+			gluBeginCurve(oNurb);{
+				gluNurbsCurve(
+						oNurb,
+						knots.size(), knots.data(),
+						4, (Point::value_type*) control.data(), //stride and control points
+						order,
+						GL_MAP1_VERTEX_3
+						);
+			}gluEndCurve(oNurb);
+		}
 
 		glPopAttrib();
 		gluDeleteNurbsRenderer(oNurb); //TODO: encapsular el New/Delete
@@ -99,6 +130,8 @@ class Nurbs{
 
 	void add_control_point( Point p ){
 		this->control.push_back(p);
+		knots.push_back(1);
+		uniforme();
 	}
 
 	void increase_order(){
@@ -110,6 +143,40 @@ class Nurbs{
 			--order;
 	}
 
+	void clear(){
+		control.clear();
+	}
+
+	//distribucion de los knots
+	void uniforme(){
+		if(knots.size() < 2) return;
+
+		int n = knots.size()-2;
+		for(int K=1, L=0; L<n; ++K, ++L)
+			knots[K] = L*1.0/(n-1);
+		knots[0] = 0; //no se usan, OpenGL los requiere
+		knots[ knots.size()-1 ] = 1;
+	}
+
+	//@@@
+	void interpola_unif(){ //interpola los extremos, uniforme el resto
+		if(knots.size() < 2) return;
+
+		//multiplicidad igual al grado, entonces interpola
+		std::fill( knots.begin()+1, knots.begin()+order, 0 );
+		std::fill( knots.rbegin()+1, knots.rbegin()+order, 1 );
+
+		int n = knots.size()-2*order;
+		for(int K=order, L=0; L<n; ++K,++L)
+			knots[K] = (L+1)*1.0/(n+1);
+
+		knots[0] = 0; //no se usan, OpenGL los requiere
+		knots[ knots.size()-1 ] = 1;
+	}
+
+	void cerrar_abrir(){
+		cerrada = not cerrada;
+	}
 };
 
 namespace{
@@ -119,7 +186,7 @@ namespace{
 int main(int argc, char *argv[]){
 	glutInit(&argc,argv); // inicializa glut
 	init();
-	if (argc==1) 
+	if (argc==1)
 		file = "default.nurb";
 	else{
 		file = argv[1];
@@ -127,7 +194,7 @@ int main(int argc, char *argv[]){
 	}
 
 	show_help();
-	glutMainLoop(); 
+	glutMainLoop();
 	return 0;
 }
 
@@ -144,7 +211,7 @@ void init() {
 	glutReshapeFunc(reshape_cb);
 	//glutIdleFunc(idle_cb);
 
-	glMatrixMode(GL_MODELVIEW); 
+	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glClearColor(color_fondo[0], color_fondo[1], color_fondo[2], color_fondo[3]);
 }
@@ -226,6 +293,13 @@ void keyboard_cb(unsigned char key,int x,int y) {
 		nurbs.increase_order();
 	else if(key == 'A')
 		nurbs.decrease_order();
+	else if(key == 'u')
+		nurbs.uniforme();
+	else if(key == 'i')
+		nurbs.interpola_unif();
+	else if(key == 'c')
+		nurbs.cerrar_abrir();
+	
 
 	std::cerr << "order: " << nurbs.order << '\n';
 	glutPostRedisplay();
