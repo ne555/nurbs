@@ -92,9 +92,19 @@ class Nurbs{
 			control_aux.insert( control_aux.end(), control.begin(), control.begin()+order-1 );
 			std::vector<float> knots_aux = knots;
 			knots_aux.resize( control_aux.size()+order );
-			for(int K=knots.size()-1; K<knots_aux.size()-1; ++K)
-				knots_aux[K] = 1+knots[K-knots.size()+3];
-			//normalise
+
+			//mantener la relacion de los knots
+			std::copy(
+				knots.begin()+1,
+				knots.begin()+order+1,
+				knots_aux.begin()+knots.size()-2
+			);
+
+			//no decrecientes
+			for(int K=knots.size()-2;  K<knots_aux.size()-1; ++K)
+				++knots_aux[K];
+
+			//[0,1]
 			double factor = knots_aux[knots_aux.size()-2];
 			for(int K=0; K<knots_aux.size(); ++K)
 				knots_aux[K] /= factor;
