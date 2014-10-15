@@ -271,9 +271,16 @@ void display_cb() {
 
 void mouse_cb(int button, int state, int x, int y){
 	double TOL=5;
+
+	double ratio = double(w)/h;
 	double
 		xx = x*2.0/w - 1,
 		yy = -y*2.0/h + 1;
+	if( ratio<1 )
+		yy /= ratio;
+	else
+		xx *= ratio;
+
 	if( button==GLUT_LEFT_BUTTON ){
 		if( state==GLUT_DOWN ){
 			//agrega puntos de control
@@ -295,6 +302,23 @@ void reshape_cb(int aw, int ah){
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
+	double ratio = double(w)/h;
+
+	//mantener escala uniforme y rango ([-1,-1]; [1,1]) siempre visible
+	if( ratio<1 )
+		glOrtho(
+			-1,1,
+			-1/ratio, 1/ratio,
+			-1,1
+		);
+	else
+		glOrtho(
+			-ratio, ratio,
+			-1,1,
+			-1,1
+		);
+
+
 	glutPostRedisplay();
 }
 
@@ -309,7 +333,7 @@ void keyboard_cb(unsigned char key,int x,int y) {
 		nurbs.interpola_unif();
 	else if(key == 'c')
 		nurbs.cerrar_abrir();
-	
+
 
 	std::cerr << "order: " << nurbs.order << '\n';
 	glutPostRedisplay();
