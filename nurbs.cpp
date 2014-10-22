@@ -551,6 +551,30 @@ struct Nurb {
 		}
 	}
 
+	//crea un ciclo con los puntos de control y los knots
+	//se insertan copias al final de los primeros n=order puntos
+	//para los knots se insertan los desplazamientos
+	void Cerrar(){
+		for(int K=num, L=0; L<order; ++K, ++L){
+			controls[K][X]=controls[L][X];
+			controls[K][Y]=controls[L][Y];
+			controls[K][Z]=controls[L][Z];
+			controls[K][W]=controls[L][W];
+		}
+		num += order;
+
+		for(int K=knum-1, L=1; L<=order; ++K, ++L){
+			knots[K] = knots[K-1] + knots[L+1] - knots[L];
+		}
+		knum += order;
+
+		//normalizar, no es necesario para definir la curva
+		//se usa para dibujar el knot vector
+		for(int K=0; K<knum; ++K)
+			knots[K] /= knots[knum-2];
+		knots[knum] = 1;
+	}
+
 
 	// dibuja la curva, el poligono de control y los pts
 
@@ -1170,7 +1194,10 @@ void keyboard_cb(unsigned char key,int x=0,int y=0) {
 		sel_u=SEL_NONE;
 		nurb.ZoomOut(x,y);
 		glutPostRedisplay();
+	} else if (key=='C'){
+		nurb.Cerrar();
 	}
+	glutPostRedisplay();
 }
 
 void show_help() {
