@@ -280,7 +280,7 @@ struct Nurb {
   // de que todo punto de la curva esta dentro del convex hull de sus puntos de control,
   // y asi recursivamente se va acotando el espacio de busqueda hasta que mida 1 pixel
 
-	float FindU(int x, int y, float tol=25) {
+	float FindU(int x, int y, float tol=50) {
 
 		if (num<order)
 			return SEL_NONE;
@@ -300,9 +300,11 @@ struct Nurb {
   // si el bb es suficientemente chico encontramos u, sino se divide la
   // curva en dos y se lanza recursivamente
 
-	float FindUbb(Nurb &n2, int &x, int &y, float from, float to, int cfrom, int cto, float &tol) {
+	float FindUbb(Nurb &n2, int &x, int &y, float from, float to, int cfrom, int cto, float tol) {
 
-		GLfloat mx,my,Mx,My;
+		if( cto-cfrom < order )
+			cto = cfrom + order;
+		GLfloat mx,my,Mx,My; //bounding box
 		mx=Mx=n2.controls[cfrom][X]/n2.controls[cfrom][W];
 		my=My=n2.controls[cfrom][Y]/n2.controls[cfrom][W];
 
