@@ -193,6 +193,7 @@ struct Nurb {
 	int order; // orden de la curva ( = grado+1 )
 	int knum; // cantidad de knots ( = num + order )
 	float detail; // tolerancia para el rasterizado de opengl
+	bool cerrada;
 	int knots_points[ARRAY_MAX][2]; // coord donde se dibujan los knots en la ventana
 	int share_int; // auxiliar (para FindU)
 	GLfloat aux_c[2][10][4]; // auxiliar (para InsertKnot)
@@ -202,6 +203,7 @@ struct Nurb {
 		num=n2.num;
 		knum=n2.knum;
 		order=n2.order;
+		cerrada=n2.cerrada;
 		memcpy((void*)controls,(void*)n2.controls,sizeof(float)*4*num);
 		memcpy((void*)knots,(void*)n2.knots,sizeof(float)*ARRAY_MAX);
 	}
@@ -234,6 +236,7 @@ struct Nurb {
 		for (i=order-1;i<ARRAY_MAX;i++)
 			knots[i]=1;
 		*/
+		cerrada = false;
 	}
 
 
@@ -572,7 +575,24 @@ struct Nurb {
 		//se usa para dibujar el knot vector
 		for(int K=0; K<knum; ++K)
 			knots[K] /= knots[knum-2];
-		knots[knum] = 1;
+		knots[knum-1] = 1;
+
+		cerrada = true;
+	}
+
+	void Abrir(){
+		if( not cerrada ) return;
+		//eliminar los puntos que creaban el ciclo;
+		num -= order;
+		knum -= order;
+
+		//normalizar, no es necesario para definir la curva
+		//se usa para dibujar el knot vector
+		for(int K=0; K<knum; ++K)
+			knots[K] /= knots[knum-2];
+		knots[knum-1] = 1;
+
+		cerrada = false;
 	}
 
 
@@ -1196,6 +1216,8 @@ void keyboard_cb(unsigned char key,int x=0,int y=0) {
 		glutPostRedisplay();
 	} else if (key=='C'){
 		nurb.Cerrar();
+	} else if (key=='A'){
+		nurb.Abrir();
 	}
 	glutPostRedisplay();
 }
