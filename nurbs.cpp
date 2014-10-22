@@ -185,6 +185,17 @@ void escribir(const char *t,int n, const char *t2, float f) {
 	texto[i]='\0';
 }
 
+template<class T>
+void multiply_vector( T *array, size_t size, T value ){
+	for(size_t K=0; K<size; ++K)
+		array[K] *= value;
+}
+
+//range []
+template<class T>
+bool between(T beg, T med, T end){
+	return beg<=med and med<=end;
+}
 
 struct Nurb {
 	GLfloat controls[ARRAY_MAX][4]; // puntos de control (x,y,z,w)
@@ -557,6 +568,7 @@ struct Nurb {
 	//crea un ciclo con los puntos de control y los knots
 	//se insertan copias al final de los primeros n=order puntos
 	//para los knots se insertan los desplazamientos
+	//escalados segun la primera y ultima diferencias
 	void Cerrar(){
 		for(int K=num, L=0; L<order; ++K, ++L){
 			controls[K][X]=controls[L][X];
@@ -566,8 +578,9 @@ struct Nurb {
 		}
 		num += order;
 
-		for(int K=knum-1, L=1; L<=order; ++K, ++L){
-			knots[K] = knots[K-1] + knots[L+1] - knots[L];
+		double factor = (knots[knum-2]-knots[knum-3]) / (knots[2]-knots[1]);
+		for(int K=knum-1, L=order-1; L<2*order; ++K, ++L){
+			knots[K] = knots[K-1] + factor*(knots[L] - knots[L-1]);
 		}
 		knum += order;
 
@@ -1003,6 +1016,7 @@ void idle_cb() {
 
 }
 
+
 // callback del motion de la ventana de imagenes
 void motion_cb(int x, int y) {
 	mx=x;my=y;
@@ -1010,6 +1024,22 @@ void motion_cb(int x, int y) {
 	if (drag==MT_CONTROL) { // si se esta arrastrando un punto de control
 		nurb.controls[sel_control][X]=x*nurb.controls[sel_control][W];
 		nurb.controls[sel_control][Y]=y*nurb.controls[sel_control][W];
+
+		if( nurb.cerrada ){
+			int K = -1;
+			if( between( 0, sel_control, nurb.order-1 ) ){
+				K = nurb.num - nurb.order + sel_control;
+			}
+			else if( between( nurb.num-nurb.order, sel_control, nurb.num-1 ) ){
+				K = sel_control - (nurb.num-nurb.order);
+			}
+			if( K not_eq -1 ){
+				nurb.controls[K][X] = nurb.controls[sel_control][X];
+				nurb.controls[K][Y] = nurb.controls[sel_control][Y];
+				nurb.controls[K][Z] = nurb.controls[sel_control][Z];
+				nurb.controls[K][W] = nurb.controls[sel_control][W];
+			}
+		}
 		glutPostRedisplay();
 	} else if (drag==MT_COORD_W) { // si se esta cambiando la w de un pto de control
 		float oldW=nurb.controls[sel_control][W], newW=last_w+float(last_my-y)/20;
@@ -1029,6 +1059,22 @@ void motion_cb(int x, int y) {
 			nurb.knots[sel_knot]=nurb.knots[sel_knot+1];
 		else
 			nurb.knots[sel_knot]=p;
+
+		if( nurb.cerrada ){
+			int K=-1;
+			if( between( 1, sel_knot, nurb.order+1 ) ){
+				K = nurb.knum - nurb.order + sel_knot - 2;
+			}
+			else if( between( nurb.knum-nurb.order, sel_knot, nurb.knum-1 ) ){
+				K = sel_knot - (nurb.knum-1-nurb.order);
+			}
+
+			if( K not_eq -1 ){
+				nurb.knots[K] = nurb.knots[K-1] + nurb.knots[sel_knot] - nurb.knots[sel_knot-1];
+			}
+			multiply_vector( nurb.knots, nurb.knum, 1/nurb.knots[nurb.knum-2] );
+			nurb.knots[nurb.knum-1] = 1;
+		}
 		glutPostRedisplay();
 		escribir("knot ",sel_knot, "  -  u = ",nurb.knots[sel_knot]);
 	} else if (drag==MT_DETAIL) { // si se esta cambiando la tolerancia para el dibujo
