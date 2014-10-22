@@ -1061,19 +1061,8 @@ void motion_cb(int x, int y) {
 			nurb.knots[sel_knot]=p;
 
 		if( nurb.cerrada ){
-			int K=-1;
-			if( between( 1, sel_knot, nurb.order+1 ) ){
-				K = nurb.knum - nurb.order + sel_knot - 2;
-			}
-			else if( between( nurb.knum-nurb.order, sel_knot, nurb.knum-1 ) ){
-				K = sel_knot - (nurb.knum-1-nurb.order);
-			}
-
-			if( K not_eq -1 ){
-				nurb.knots[K] = nurb.knots[K-1] + nurb.knots[sel_knot] - nurb.knots[sel_knot-1];
-			}
-			multiply_vector( nurb.knots, nurb.knum, 1/nurb.knots[nurb.knum-2] );
-			nurb.knots[nurb.knum-1] = 1;
+			nurb.Abrir();
+			nurb.Cerrar();
 		}
 		glutPostRedisplay();
 		escribir("knot ",sel_knot, "  -  u = ",nurb.knots[sel_knot]);
