@@ -268,7 +268,7 @@ struct Nurb {
 
 	float FindU(int x, int y, float tol=25) {
 
-		if (num<order) 
+		if (num<order)
 			return SEL_NONE;
 		Nurb n2(*this);
 		int k1 = n2.InsertKnot(knots[order-1],true);
@@ -283,7 +283,7 @@ struct Nurb {
 
 	// esta func verifica si el pto que se busca esta dentro o cerca del bb
   // (voy a usar el bb en lugar del ch para simplificar la implementacion)
-  // si el bb es suficientemente chico encontramos u, sino se divide la 
+  // si el bb es suficientemente chico encontramos u, sino se divide la
   // curva en dos y se lanza recursivamente
 
 	float FindUbb(Nurb &n2, int &x, int &y, float from, float to, int cfrom, int cto, float &tol) {
@@ -343,14 +343,14 @@ struct Nurb {
 		}	
 		k--;
 		// corregir el extremo inferior para que no se salga
-		if(degree-s<1) 
+		if(degree-s<1)
 			s=degree-1;
 		// inicializar el vector auxiliar donde se van a guardar los pasos
 	// (solo se guardan los ultimos dos, alternando entre las cols 0 y 1)
 		int ar=1, lr=0, p=0, j;
 		for (int i=k-degree;i<=k-s+2;i++) {
-			if (i>=num) 
-				j=num-1; 
+			if (i>=num)
+				j=num-1;
 			else
 				j=i;
 			aux_c[0][p][X]=controls[j][X];
@@ -384,7 +384,7 @@ struct Nurb {
 	}
 
 
-	// para agregar un pto al final, se agrega el pto de control a la lista y 
+	// para agregar un pto al final, se agrega el pto de control a la lista y
   // se escalan los ktnos (para mantener la forma de la curva)
 
 	int AddControlPoint(GLfloat x, GLfloat y) {
@@ -401,8 +401,8 @@ struct Nurb {
 	}
 
 
-	// algoritmo de De Boor 
-  // interpolate = true inserta tantas veces como sea necesario hasta que haya 
+	// algoritmo de De Boor
+  // interpolate = true inserta tantas veces como sea necesario hasta que haya
   // un pto de control en esa posicion de la curva (continuidad c0)
   // interpolate = false agrega una sola vez siempre y cuando la cantidad de veces
   // que ya esta presente no sea mayor al orden (se puede asi llegar a perder
@@ -430,7 +430,7 @@ struct Nurb {
 			share_int++;
 			int i;
 			// hacer lugar para el nuevo knot
-			for (i=knum;i>k;i--) 
+			for (i=knum;i>k;i--)
 				knots[i+1]=knots[i];
 			// insertar el knot
 			knots[k+1]=t;
@@ -513,7 +513,7 @@ struct Nurb {
 	}
 
 
-	// reacomoda los knots equiespaciadamente 
+	// reacomoda los knots equiespaciadamente
   // o interpolando los extremos y en medio equiespaciadamente
 
 	void ResetKnots(bool interpolate=false) {
@@ -555,6 +555,18 @@ struct Nurb {
 	// dibuja la curva, el poligono de control y los pts
 
 	void Dibujar() {
+
+		if (draw_control) { // draw control points
+			glColor3fv(color_cpoint);
+			glPointSize(4);
+			glBegin(GL_POINTS);
+			for (int i=0;i<num;i++){
+				float w=controls[i][W];
+				if (w>0) glVertex4fv(controls[i]);
+				else glVertex4f(-controls[i][X],-controls[i][Y],0,-controls[i][W]);
+			}
+			glEnd();
+		}
 
 		if (draw_polygon) { // draw control polygon
 			glLineWidth(1);
@@ -623,7 +635,7 @@ struct Nurb {
 
 		// dibujar los knot sobre la curva
 	// (por alguna razon los de los extremos (p primeros y p ultimos) no tienen sentido, asi que no se dibujan
-		if (draw_knots) { 
+		if (draw_knots) {
 			float *p;
 			glColor3fv(color_knot);
 			glPointSize(5);
@@ -637,22 +649,11 @@ struct Nurb {
 			glEnd();
 		}
 
-		if (draw_control) { // draw control points
-			glColor3fv(color_cpoint);
-			glPointSize(4);
-			glBegin(GL_POINTS);
-			for (int i=0;i<num;i++){
-				float w=controls[i][W];
-				if (w>0) glVertex4fv(controls[i]);
-				else glVertex4f(-controls[i][X],-controls[i][Y],0,-controls[i][W]);
-			}
-			glEnd();
-		}
 
 	}
 
 
-	// guardar/cargar los datos de la nurb en un archivo de texto 
+	// guardar/cargar los datos de la nurb en un archivo de texto
   // (es el que se le pasa como parametro al ejecutable)
 	void Save(char *fname) {
 		ofstream fil(fname,ios::trunc);
@@ -736,7 +737,7 @@ void display_cb() {
 		glEnd();
 	}
 
-	if (draw_basis) { 
+	if (draw_basis) {
 		glColor3fv(color_knot);
 		for (int i=0;i<nurb.num;i++) { // por cada pt de control
 			glLineWidth(sel_control==i?2:1);
@@ -817,6 +818,23 @@ void display_cb() {
 		}
 	}
 
+	sel_u=nurb.FindU(mx,my);
+	if (sel_u>0){
+		//porcion de la curva que representa
+		int K=0;
+		for(; K<ARRAY_MAX and nurb.knots[K]<sel_u; ++K)
+			;
+
+		glLineWidth(5);
+		glColor3fv(color_cline);
+		glBegin(GL_LINE_STRIP);
+
+		for (int i=K-1;i>=0 and K-1-i<nurb.order;i--)
+			glVertex4fv(nurb.controls[i]);
+
+		glEnd();
+	}
+
 
 	int i=0;
 	glColor3fv(color_texto);
@@ -849,7 +867,7 @@ void idle_cb() {
 				int m_ksel=SEL_NONE;
 				sel_control=SEL_NONE;
 				for (int i=0;i<nurb.knum;i++) { // buscar el knot mas cercano
-					d1 = knots_nodes[i]>x? knots_nodes[i]-x : x-knots_nodes[i]; 
+					d1 = knots_nodes[i]>x? knots_nodes[i]-x : x-knots_nodes[i];
 					if (d1<md) {
 						md=d1;
 						m_ksel=i;
@@ -898,7 +916,7 @@ void idle_cb() {
 						escribir();
 					else
 						escribir("pto control ",m_csel,"  -  w = ",nurb.controls[m_csel][W]);
-				} 
+				}
 				sel_knot=SEL_NONE;
 				if (sel_on_curve && draw_knots && m_csel==SEL_NONE) {
 					for (int i=nurb.order;i<nurb.knum;i++) {
@@ -942,7 +960,7 @@ void idle_cb() {
 }
 
 // callback del motion de la ventana de imagenes
-void motion_cb(int x, int y) { 
+void motion_cb(int x, int y) {
 	mx=x;my=y;
 	mouse_moved=true;
 	if (drag==MT_CONTROL) { // si se esta arrastrando un punto de control
@@ -991,10 +1009,10 @@ void mouse_cb(int button, int state, int x, int y){
 			if (drag==MT_NONE) {
 				if (sel_detail)
 					drag = MT_DETAIL;
-				else if (sel_control!=SEL_NONE) { 
+				else if (sel_control!=SEL_NONE) {
 					if (sel_control!=SEL_NEW) // mover un punto de control
 						drag = MT_CONTROL;
-				} else if (sel_knot!=SEL_NONE) { 
+				} else if (sel_knot!=SEL_NONE) {
 					if (sel_knot!=SEL_NEW) { // mover un knot existente
 						drag = MT_KNOT;
 						sel_x=MARGIN+knot_line*nurb.knots[sel_knot]-x;
@@ -1047,7 +1065,7 @@ void reshape_cb(int aw, int ah){
 	w=aw;h=ah;
 
 	if (!h||!w) {
-		minimized=true; 
+		minimized=true;
 		return;
 	} else
 		minimized=false;
@@ -1150,7 +1168,7 @@ void keyboard_cb(unsigned char key,int x=0,int y=0) {
 	} else if (key=='-') {
 		sel_control=SEL_NONE;
 		sel_u=SEL_NONE;
-		nurb.ZoomOut(x,y); 
+		nurb.ZoomOut(x,y);
 		glutPostRedisplay();
 	}
 }
@@ -1184,10 +1202,10 @@ void show_help() {
 void init() {
 	glutInitDisplayMode(GLUT_RGB|GLUT_DOUBLE);
 
-	glutInitWindowSize(w,h); 
+	glutInitWindowSize(w,h);
 	glutInitWindowPosition(100,100);
 	glutCreateWindow("Nurbs Demo");
-	glMatrixMode(GL_PROJECTION); 
+	glMatrixMode(GL_PROJECTION);
 	glOrtho(0,w,0,h,1,1);
 	minimized=false;
 
@@ -1203,7 +1221,7 @@ void init() {
 	knot_line=w-MARGIN*2;
 	detail_line=h-MARGIN*3;
 	detail_pos = int(MARGIN+(nurb.detail-1)/MAX_DETAIL*detail_line);
-	glMatrixMode(GL_MODELVIEW); 
+	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glClearColor(color_fondo[0],color_fondo[1],color_fondo[2],1);
 
@@ -1219,6 +1237,6 @@ int main(int argc, char *argv[]){
 		nurb.Load(nurb_file);
 	}
 	show_help();
-	glutMainLoop(); 
+	glutMainLoop();
 	return 0;
 }
