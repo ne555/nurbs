@@ -303,7 +303,7 @@ struct Nurb {
 	float FindUbb(Nurb &n2, int &x, int &y, float from, float to, int cfrom, int cto, float tol) {
 
 		if( cto-cfrom < order )
-			cto = cfrom + order;
+			cto = cfrom + order - 1;
 		GLfloat mx,my,Mx,My; //bounding box
 		mx=Mx=n2.controls[cfrom][X]/n2.controls[cfrom][W];
 		my=My=n2.controls[cfrom][Y]/n2.controls[cfrom][W];
